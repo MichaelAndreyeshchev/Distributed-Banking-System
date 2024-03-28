@@ -52,7 +52,7 @@ public class RMIBankServerImp implements RMIBankServer {
             int serverID = Integer.parseInt(config[1]);
 
             if (serverID != this.serverID) {
-                String serverAddress = "//" + config[0] + ":" + config[2] + "/RMIBankServer" + config[1];
+                String serverAddress = "//" + config[0] + ":" + config[2] + "/Server_" + config[1];
                 serverIDToAddress.put(serverID, serverAddress);
             }
         }
@@ -61,16 +61,33 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public void shutdown() throws RemoteException { // unbinds the server from the RMI registry and unexports the RMI object, effectively shutting down the server
         try {
-            System.out.println("Server is terminating.");
-            Registry localRegistry = LocateRegistry.getRegistry(InetAddress.getLocalHost().getCanonicalHostName(), 500 + serverID);
-            localRegistry.unbind ("RMIBankServer" + serverID);
+            System.out.println("Server is terminating...");
+
+            for (String replicaAddress : serverIDToAddress.values()) {
+                replicaAddress = replicaAddress.replaceFirst("//", "");
+                String host = replicaAddress.split(":", 2)[0];
+                int port = Integer.parseInt(replicaAddress.split(":", 2)[1].split("/", 2)[0]);
+
+                //RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
+                Registry localRegistry = LocateRegistry.getRegistry(host, port);
+
+                String[] boundNames = localRegistry.list();
+                System.out.println("Names bound in RMI registry:");
+                for (String name : boundNames) {
+                    System.out.println(name);
+                    //RMIBankServer bankServerStub = (RMIBankServer) registry.lookup(name);
+                }
+                localRegistry.unbind("Server_" + serverID);
+                
+            }
             UnicastRemoteObject.unexportObject(this, true);
             System.out.println("RMI Server Port Shutdown Completed!");
             //System.exit(0);
+        
         }
 
         catch (Exception e) {
-            System.out.println("exception in shutdown");
+            System.out.println(e);
         }
     }
 
@@ -139,6 +156,7 @@ public class RMIBankServerImp implements RMIBankServer {
         String requestQueueString = sb.toString();
 
         ServerLogger.haltResultLog(String.valueOf(serverID), "[" + clock.getTime() + ", " + serverID + "]", balanceAllAccounts, requestQueueString);
+        System.out.println(String.valueOf(serverID) +  " [" + clock.getTime() + ", " + serverID + "] " + " " + balanceAllAccounts + " " + requestQueueString);
 
         return "OK";
 
@@ -190,6 +208,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public void processRequest() throws MalformedURLException, RemoteException, NotBoundException {
         while (!requests.isEmpty() && executeRequestCheck(requests.peek())) {
+            System.out.println(clock.getTime());
             Request request = requests.poll();
             executeRequest(request);
 
@@ -231,7 +250,7 @@ public class RMIBankServerImp implements RMIBankServer {
         }
 
         try {
-            String hostname = "127.0.0.1";
+            String hostname = "";
             int port = -1;
             int serverID = Integer.parseInt(args[0]);
             String configFilePath = args[1];
@@ -252,23 +271,27 @@ public class RMIBankServerImp implements RMIBankServer {
             }
 
             Registry registry;
-            //Naming.bind("//" + InetAddress.getLocalHost().getCanonicalHostName() + ":" + args[0] + "/RMIBankServer", bankServerStub);
+
             try {
-                registry = LocateRegistry.getRegistry(port);
-                registry.list(); 
-            } catch (RemoteException e) {
                 registry = LocateRegistry.createRegistry(port);
             }
 
+            catch (Exception e) {
+                registry = LocateRegistry.getRegistry(port);
+            }
+
+            
+
             RMIBankServerImp bankServer = new RMIBankServerImp(configFilePath, serverID);
             
-            System.setProperty("java.rmi.server.hostname", InetAddress.getLocalHost().getCanonicalHostName());
+            System.setProperty("java.rmi.server.hostname", hostname);
             RMIBankServer bankServerStub = (RMIBankServer) UnicastRemoteObject.exportObject(bankServer, 0) ;
 
 
             //Registry registry = LocateRegistry.createRegistry(5000 + serverID); // Example port assignment logic
-            Naming.rebind("//" + InetAddress.getLocalHost().getCanonicalHostName() + ":" + port + "/Server_" + serverID, bankServerStub);
+            registry.bind("Server_" + serverID, bankServerStub);
             System.out.println("Server " + serverID + " is ready.");
+            System.out.println("//" + hostname + ":" + port + "/Server_" + serverID);
         }
 
         catch (Exception e) {

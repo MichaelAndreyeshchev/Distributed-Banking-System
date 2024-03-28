@@ -27,7 +27,17 @@ public class RMIBankClient {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] config = line.split(" ");
-                RMIBankServer bankServerStub = (RMIBankServer) Naming.lookup("//" + InetAddress.getLocalHost().getCanonicalHostName() + ":" + Integer.parseInt(config[2]) + "/Server_" + Integer.parseInt(config[1]));
+            
+                Registry registry = LocateRegistry.getRegistry(config[0], Integer.parseInt(config[2]));
+                // String[] boundNames = registry.list();
+                // System.out.println("Names bound in RMI registry:");
+                // for (String name : boundNames) {
+                //     System.out.println(name);
+                //     //RMIBankServer bankServerStub = (RMIBankServer) registry.lookup(name);
+
+                // }
+                // RMIBankServer bankServerStub = (RMIBankServer) registry.lookup("//" + config[0] + ":" + Integer.parseInt(config[2]) + "/Server_" + Integer.parseInt(config[1]));
+                RMIBankServer bankServerStub = (RMIBankServer) registry.lookup("Server_" + Integer.parseInt(config[1]));
                 bankServerStubs.add(bankServerStub);
             }
 
@@ -57,17 +67,12 @@ public class RMIBankClient {
                         } catch (MalformedURLException e) {
                             System.out.print("Maleformed URL error encountered!");
                         } catch (NotBoundException e) {
-                            System.out.print("Not Bound error encountered!");
+                            System.out.println(e);
+                            //System.out.print("Not Bound error encountered!");
                         }
                     }
                 });
             }
-            RMIBankServer bankServerStub = bankServerStubs.get(0);
-
-            Request request = new Request("halt", -1, -1, -1, -1, 0);
-            ClientLogger.sendLog("0", bankServerStub.getServerID() + "", "REQ", "halt", "");
-            String response = bankServerStub.clientRequest(request);
-            ClientLogger.recieveLog("0", bankServerStub.getServerID() + "", "halt", response);
 
             executor.shutdown();
 
@@ -80,8 +85,19 @@ public class RMIBankClient {
                 System.out.println("Thread was interrupted!");
             }
 
-            bankServerStub.shutdown();
-            
+            RMIBankServer bankServerStub = bankServerStubs.get(0);
+
+            Request request = new Request("halt", -1, -1, -1, -1, 0);
+            ClientLogger.sendLog("0", bankServerStub.getServerID() + "", "REQ", "halt", "");
+            String response = bankServerStub.clientRequest(request);
+            ClientLogger.recieveLog("0", bankServerStub.getServerID() + "", "halt", response);
+
+            //RMIBankServer serverStub = bankServerStubs.get(0);
+            //serverStub.shutdown();
+
+            //for (RMIBankServer serverStub : bankServerStubs) {
+            //    serverStub.shutdown();
+            //}
             // int totalAccountsBalance = 0;
             // RMIBankServer bankServerStub = bankServerStubs.get(random.nextInt(bankServerStubs.size()));
 

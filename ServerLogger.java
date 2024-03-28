@@ -2,7 +2,7 @@ import java.io.*;
 import java.time.LocalDateTime;
 
 public class ServerLogger {
-    private static final String FILE_NAME = "clientLogfile.log";
+    private static final String FILE_NAME = "serverLogfile.log";
 
     public static synchronized void recieveClientLog(String serverID, String requestTimestamp, String clientID, String operationName, String parameters) {
         try  {
