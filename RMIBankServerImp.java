@@ -232,7 +232,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
         try {
             String hostname = "127.0.0.1";
-            int port = 5000;
+            int port = -1;
             int serverID = Integer.parseInt(args[0]);
             String configFilePath = args[1];
             BufferedReader reader = new BufferedReader(new FileReader(configFilePath));
@@ -246,6 +246,10 @@ public class RMIBankServerImp implements RMIBankServer {
                 }
             }
             reader.close();
+
+            if (port == -1) {
+                throw new Exception("Entered a non existant serverID!");
+            }
 
             Registry registry;
             //Naming.bind("//" + InetAddress.getLocalHost().getCanonicalHostName() + ":" + args[0] + "/RMIBankServer", bankServerStub);
