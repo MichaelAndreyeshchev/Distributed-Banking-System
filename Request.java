@@ -1,6 +1,6 @@
 import java.io.Serializable;
 
-public class Request implements Serializable {
+public class Request implements Serializable, Comparable<Request> {
     private String requestType;
     private int sourceAccountUID;
     private int targetAccountUID;
@@ -15,6 +15,17 @@ public class Request implements Serializable {
         this.amount = amount;
         this.timestamp = timestamp;
         this.sendingServerID = sendingServerID;
+    }
+
+    public int compareTo(Request request) {
+        if (this == null || request == null) {
+            return 0;
+        }
+        if (this.timestamp != request.getTimestamp()) {
+            return this.timestamp - request.getTimestamp();
+        } else {
+            return this.sendingServerID - request.getSendingServerID();
+        }
     }
 
     public String getRequestType() {

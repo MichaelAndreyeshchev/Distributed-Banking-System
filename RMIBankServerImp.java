@@ -23,7 +23,7 @@ public class RMIBankServerImp implements RMIBankServer {
     private ConcurrentHashMap<Integer, Account> accounts = new ConcurrentHashMap<>(); // ConcurrentHashMap that maps unique account IDs to Account objects, representing the bank accounts managed by the server
     private AtomicInteger accountUIDCounter = new AtomicInteger(1); // generate unique IDs for new accounts, starting from 1
     private LamportClock clock = new LamportClock(); // Lamport clock to help with executing the same sequence of operations, using the State Machine Model
-    private PriorityQueue<Request> requests = new PriorityQueue<>(Comparator.comparingInt(Request::getTimestamp));
+    private PriorityQueue<Request> requests = new PriorityQueue<>();
     private ConcurrentHashMap<Integer, Integer> ackRecieved = new ConcurrentHashMap<>();
     private Map<Integer, String> serverIDToAddress = new HashMap<>();
     //private Map<Integer, RMIBankServer> replicaServers = new HashMap();
@@ -170,6 +170,7 @@ public class RMIBankServerImp implements RMIBankServer {
         clock.increment();
         int logicalTime = clock.getTime();
         request.setTimestamp(logicalTime);
+        System.out.println("timestamp: " + request.getTimestamp());
         ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), "");
         request.SetSendingServerID(this.serverID);
         requests.add(request);
@@ -178,7 +179,7 @@ public class RMIBankServerImp implements RMIBankServer {
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             replica.multicast(request, this.serverID);
         }
-
+        processRequest();
         return "OK";
     }
 
@@ -189,20 +190,24 @@ public class RMIBankServerImp implements RMIBankServer {
         requests.add(request);
         String senderAddress = serverIDToAddress.get(senderID);
         RMIBankServer sender = (RMIBankServer) Naming.lookup(senderAddress);
-        sender.acknowledge(request.getTimestamp());
+        sender.acknowledge(request.getTimestamp(), this.serverID);
     }
 
-    public void acknowledge(int timestamp) throws RemoteException, MalformedURLException, NotBoundException {
+    public void acknowledge(int timestamp, int id) throws RemoteException, MalformedURLException, NotBoundException {
         clock.update(timestamp);
-        ackRecieved.put(timestamp, ackRecieved.getOrDefault(timestamp, 0) + 1);
+        ackRecieved.put(id, timestamp);
         //for (String replicaAddress : replicaServers) {
         //    ackRecieved.put(timestamp, ackRecieved.getOrDefault(timestamp, 0) + 1);
         //}
-        processRequest();
     }
 
     public boolean executeRequestCheck(Request request) throws RemoteException {
-        return ackRecieved.getOrDefault(request.getTimestamp(), 0) >= (serverIDToAddress.size() + 1);
+        for (int timestamp : ackRecieved.values()) {
+            if (timestamp < request.getTimestamp()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void processRequest() throws MalformedURLException, RemoteException, NotBoundException {
