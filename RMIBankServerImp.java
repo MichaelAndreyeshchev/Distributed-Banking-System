@@ -211,7 +211,7 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void processRequest() throws MalformedURLException, RemoteException, NotBoundException {
-        while (!requests.isEmpty() && executeRequestCheck(requests.peek())) {
+        while (!requests.isEmpty() && executeRequestCheck(requests.peek()) && requests.peek().getSendingServerID() == serverID) {
             System.out.println(clock.getTime());
             Request request = requests.poll();
             executeRequest(request);
