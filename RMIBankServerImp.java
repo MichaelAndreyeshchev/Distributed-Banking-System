@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.net.*;
 
 public class RMIBankServerImp implements RMIBankServer {
-    private static int serverID;
+    private int serverID;
     private ConcurrentHashMap<Integer, Account> accounts = new ConcurrentHashMap<>(); // ConcurrentHashMap that maps unique account IDs to Account objects, representing the bank accounts managed by the server
     private AtomicInteger accountUIDCounter = new AtomicInteger(1); // generate unique IDs for new accounts, starting from 1
     private LamportClock clock = new LamportClock(); // Lamport clock to help with executing the same sequence of operations, using the State Machine Model
@@ -34,8 +34,8 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public RMIBankServerImp(String configFilePath, int serverID) throws IOException {
         super();
-        loadConfigFile(configFilePath);
         this.serverID = serverID;
+        loadConfigFile(configFilePath);
 
         for(int i = 1; i <= 20; i++) {
             Account account = new Account(i, 1000);
@@ -187,7 +187,6 @@ public class RMIBankServerImp implements RMIBankServer {
         ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + clock.getTime() + ", " + serverID + "]", request.getRequestType(), "");
 
         requests.add(request);
-        
         String senderAddress = serverIDToAddress.get(senderID);
         RMIBankServer sender = (RMIBankServer) Naming.lookup(senderAddress);
         sender.acknowledge(request.getTimestamp());
