@@ -28,6 +28,21 @@ public class Request implements Serializable, Comparable<Request> {
         }
     }
 
+    public boolean equals(Request request) {
+        if (this == null || request == null) {
+            return false;
+        }
+        return this.timestamp == request.getTimestamp() && this.sendingServerID == request.getSendingServerID();
+    }
+
+    public boolean equals(Object other){
+        if (!(other instanceof Request)) {
+            return false;
+        }
+        Request request = (Request) other;
+        return this.equals(request);
+    }
+
     public String getRequestType() {
         return requestType;
     }

@@ -14,9 +14,7 @@ public interface RMIBankServer extends Remote {
     String halt() throws RemoteException;
     int getServerID() throws RemoteException;
     String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException;
-    void multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException;
-    void acknowledge(int amount, int id) throws RemoteException, MalformedURLException, NotBoundException;
+    int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException;
     boolean executeRequestCheck(Request request) throws RemoteException;
     void executeRequest(Request request) throws RemoteException;
-    void processRequest() throws RemoteException, MalformedURLException, NotBoundException;
 }
