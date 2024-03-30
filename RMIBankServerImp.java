@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.*;
@@ -26,6 +27,8 @@ public class RMIBankServerImp implements RMIBankServer {
     private PriorityBlockingQueue<Request> requests = new PriorityBlockingQueue<>();
     private ConcurrentHashMap<Integer, LamportClock> ackRecieved = new ConcurrentHashMap<>();
     private Map<Integer, String> serverIDToAddress = new HashMap<>();
+    private static int port;
+    private static String hostname;
     //private Map<Integer, RMIBankServer> replicaServers = new HashMap();
 
     public RMIBankServerImp() throws RemoteException {
@@ -60,39 +63,20 @@ public class RMIBankServerImp implements RMIBankServer {
         reader.close();
     }
 
-    public void shutdown() throws RemoteException { // unbinds the server from the RMI registry and unexports the RMI object, effectively shutting down the server
-        try {
-            System.out.println("Server is terminating...");
+    public void shutdown() throws RemoteException  { // unbinds the server from the RMI registry and unexports the RMI object, effectively shutting down the server
+        System.out.println("Server is terminating...");
 
-            for (String replicaAddress : serverIDToAddress.values()) {
-                replicaAddress = replicaAddress.replaceFirst("//", "");
-                String host = replicaAddress.split(":", 2)[0];
-                int port = Integer.parseInt(replicaAddress.split(":", 2)[1].split("/", 2)[0]);
-
-                //RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
-                Registry localRegistry = LocateRegistry.getRegistry(host, port);
-                
-                localRegistry.unbind("Server_" + serverID);
-
-
-                String[] boundNames = localRegistry.list();
-                System.out.println("Names bound in RMI registry:");
-                for (String name : boundNames) {
-                    System.out.println(name);
-                    //RMIBankServer bankServerStub = (RMIBankServer) registry.lookup(name);
-                }
-                localRegistry.unbind("Server_" + serverID);
-                
-            }
-            UnicastRemoteObject.unexportObject(this, true);
-            System.out.println("RMI Server Port Shutdown Completed!");
-            //System.exit(0);
-        
+        Registry localRegistry = LocateRegistry.getRegistry(hostname, port);
+        try{
+            localRegistry.unbind("Server_" + serverID);
         }
-
         catch (Exception e) {
-            System.out.println(e);
+            System.err.println("Server is not bound to the registry, finishing shutdown...");
         }
+
+        UnicastRemoteObject.unexportObject(this, true);
+        System.out.println("RMI Server Port Shutdown Completed!");
+        System.exit(0);
     }
 
     public int createAccount() throws RemoteException { // generates a unique ID for a new account, creates an account, logs the operation, and stores it in the accounts map
@@ -143,27 +127,18 @@ public class RMIBankServerImp implements RMIBankServer {
         }
     }
 
-    public String halt(Request r) throws RemoteException {
+    public void halt(Request r) throws RemoteException {
+        requests.remove(r);
         int balanceAllAccounts = 0;
 
         for (Map.Entry<Integer, Account> entry : accounts.entrySet()) {
             int balance = entry.getValue().getBalance();
             balanceAllAccounts += balance;
         }
-        
-        StringBuilder sb = new StringBuilder();
-        for (Request request : requests) {
-            sb.append(request.toString());
-            sb.append(System.lineSeparator()); // For newline
-        }
 
-        String requestQueueString = sb.toString();
-
-        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + r.getTimestamp() + ", " + serverID + "]", balanceAllAccounts, requestQueueString);
-        System.out.println(String.valueOf(serverID) +  " [" + r.getTimestamp() + ", " + serverID + "] " + " " + balanceAllAccounts + " " + requestQueueString);
-
-        return "OK";
-
+        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + r.getTimestamp() + ", " + r.getSendingServerID() + "]", balanceAllAccounts, requests.size() + " ");
+        System.out.println(String.valueOf(serverID) +  " [" + r.getTimestamp() + ", " + r.getSendingServerID() + "] " + " " + balanceAllAccounts + " " +  requests.size());
+        shutdown();
     }
 
     public int getServerID() throws RemoteException {
@@ -181,25 +156,21 @@ public class RMIBankServerImp implements RMIBankServer {
         //ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
 
-        clock.updateNoIncrement(cast(request));
+        cast(request);
 
         processRequest(request);
         return "OK";
     }
 
-    public synchronized int cast(Request request) throws RemoteException, MalformedURLException, NotBoundException {
-        LamportClock tempClock = new LamportClock();
-        tempClock.updateNoIncrement(request.getTimestamp());
-
+    public synchronized void cast(Request request) throws RemoteException, MalformedURLException, NotBoundException {
         for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
             int replicaID = entry.getKey();
             String replicaAddress = entry.getValue();
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             int timestampOther = replica.multicast(request, this.serverID);
-            tempClock.update(timestampOther);
+            clock.update(timestampOther);
             ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
         }
-        return tempClock.getTime();
     }
 
     public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException { // This is after I recieve from main server
@@ -233,64 +204,37 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException {
-        int i = 0;
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {
-            i++;
-            if (i % 100000000 == 0) {
-                System.out.println("hit waiting");
-                System.out.println(!requests.peek().equals(request));
-                System.out.println(executeRequestCheck(request) == false);
-                for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
-                    try{
-                        int replicaID = entry.getKey();
-                        String replicaAddress = entry.getValue();
-                        RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
-                        int timestampOther = replica.syncClock(clock.getTime());
-                        clock.update(timestampOther);
-                        ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
-                    }
-                    catch (Exception e){
-
-                    } 
-                }
-            }
-        }
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
         System.out.println(clock.getTime());
         castExecute(request);
-        
     }
 
     public synchronized void castExecute(Request request) throws RemoteException, MalformedURLException, NotBoundException {
-        for (String replicaAddress : serverIDToAddress.values()) {
-            RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
-            replica.executeRequest(request);
+        if (request.getRequestType().equals("halt")) {
+            for (String replicaAddress : serverIDToAddress.values()) {
+                RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
+                // Causes error always when process exits
+                try{
+                    replica.executeRequest(request);
+                }            
+                catch (RemoteException e){}
+    
+            }
+            executeRequest(request);
         }
-        executeRequest(request);
+        else {
+            for (String replicaAddress : serverIDToAddress.values()) {
+                RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
+                replica.executeRequest(request);
+            }
+            executeRequest(request);
+        }
+        
+
     }
 
     public void executeRequest(Request request) throws RemoteException {
-        int i = 0;
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false){
-            i++;
-            if (i % 100000000 == 0) {
-                System.out.println("hit waiting");
-                System.out.println(!requests.peek().equals(request));
-                System.out.println(executeRequestCheck(request) == false);
-                for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
-                    try{
-                        int replicaID = entry.getKey();
-                        String replicaAddress = entry.getValue();
-                        RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
-                        int timestampOther = replica.syncClock(clock.getTime());
-                        clock.update(timestampOther);
-                        ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
-                    }
-                    catch (Exception e){
-
-                    } 
-                }
-            }
-        }
+        while (!requests.peek().equals(request)){}
 
         switch (request.getRequestType()) {
             case "createAccount":
@@ -310,8 +254,8 @@ public class RMIBankServerImp implements RMIBankServer {
                 System.err.println("ERROR: Unknown Request Type: " + request.getRequestType());
                 break;
         }
-        requests.remove(request);
         ServerLogger.removeLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]");
+        requests.remove(request);
     }
     public static void main (String args[]) throws Exception {
         if (args.length != 2) {
@@ -320,8 +264,8 @@ public class RMIBankServerImp implements RMIBankServer {
         }
 
         try {
-            String hostname = "";
-            int port = -1;
+            hostname = "";
+            port = -1;
             int serverID = Integer.parseInt(args[0]);
             String configFilePath = args[1];
             BufferedReader reader = new BufferedReader(new FileReader(configFilePath));

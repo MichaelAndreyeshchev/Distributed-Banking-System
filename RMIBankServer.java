@@ -11,7 +11,7 @@ public interface RMIBankServer extends Remote {
     int getBalance(int sourceAcountUID) throws RemoteException;
     String transfer(int sourceAcountUID, int targetAccountUID, int amount) throws RemoteException;
     void shutdown() throws RemoteException;
-    String halt(Request r) throws RemoteException;
+    void halt(Request r) throws RemoteException;
     int getServerID() throws RemoteException;
     int syncClock(int timestamp) throws RemoteException;
     String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException;
