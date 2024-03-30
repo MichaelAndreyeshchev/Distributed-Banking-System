@@ -70,6 +70,9 @@ public class RMIBankServerImp implements RMIBankServer {
 
                 //RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
                 Registry localRegistry = LocateRegistry.getRegistry(host, port);
+                
+                localRegistry.unbind("Server_" + serverID);
+
 
                 String[] boundNames = localRegistry.list();
                 System.out.println("Names bound in RMI registry:");
@@ -171,7 +174,7 @@ public class RMIBankServerImp implements RMIBankServer {
         int logicalTime = clock.getTime();
         request.setTimestamp(logicalTime);
 
-        ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), "");
+        ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
         requests.add(request);
         
@@ -188,9 +191,9 @@ public class RMIBankServerImp implements RMIBankServer {
         return "OK";
     }
 
-    public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException {
+    public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException { // This is after I recieve from main server
         clock.update(request.getTimestamp());
-        ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + clock.getTime() + ", " + serverID + "]", request.getRequestType(), "");
+        ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]", request.getRequestType(), "");
         requests.add(request);
 
         return clock.getTime();
@@ -219,7 +222,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public void executeRequest(Request request) throws RemoteException {
         boolean succeded = requests.remove(request);
-        ServerLogger.removeLog(String.valueOf(serverID), "[" + clock.getTime() + ", " + serverID + "]");
+        ServerLogger.removeLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]");
 
         
         switch (request.getRequestType()) {

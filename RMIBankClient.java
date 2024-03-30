@@ -55,7 +55,7 @@ public class RMIBankClient {
                         
                         try {
                             Request request = new Request("transfer", sourceAcountUID, targetAccountUID, 10, -1, thread);
-                            ClientLogger.sendLog(thread + "", bankServerStub.getServerID() + "", "REQ", "transfer", "");
+                            ClientLogger.sendLog(thread + "", bankServerStub.getServerID() + "", "REQ", "transfer", " " + sourceAcountUID + " to " + targetAccountUID);
                             String response = bankServerStub.clientRequest(request);
                             ClientLogger.recieveLog(thread + "", bankServerStub.getServerID() + "", "transfer", response);
                         }

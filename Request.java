@@ -13,8 +13,8 @@ public class Request implements Serializable, Comparable<Request> {
         this.sourceAccountUID = sourceAccountUID;
         this.targetAccountUID = targetAccountUID;
         this.amount = amount;
-        this.timestamp = timestamp;
-        this.sendingServerID = sendingServerID;
+        this.timestamp = timestamp; // Lamport Clock ONLY
+        this.sendingServerID = sendingServerID; // Sender Server ID
     }
 
     public int compareTo(Request request) {
