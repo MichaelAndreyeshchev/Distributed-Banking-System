@@ -9,8 +9,9 @@ public class LamportClock {
         return logicalTime;
     }
 
-    public synchronized void increment() {
+    public synchronized int increment() {
         this.logicalTime++;
+        return this.logicalTime;
     } 
 
     public synchronized void update(int receivedLogicalTime) {

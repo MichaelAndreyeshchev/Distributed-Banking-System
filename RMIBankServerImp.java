@@ -54,6 +54,7 @@ public class RMIBankServerImp implements RMIBankServer {
             if (serverID != this.serverID) {
                 String serverAddress = "//" + config[0] + ":" + config[2] + "/Server_" + config[1];
                 serverIDToAddress.put(serverID, serverAddress);
+                ackRecieved.put(serverID, 1);
             }
         }
         reader.close();
@@ -170,11 +171,10 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException {        
-        clock.increment();
-        int logicalTime = clock.getTime();
+        int logicalTime = clock.increment();
         request.setTimestamp(logicalTime);
 
-        ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
+        //ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
         requests.add(request);
         
@@ -184,7 +184,9 @@ public class RMIBankServerImp implements RMIBankServer {
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             int timestampOther = replica.multicast(request, this.serverID);
             clock.update(timestampOther);
-            ackRecieved.put(replicaID, timestampOther);
+            if (timestampOther > ackRecieved.getOrDefault(replicaID, 0)) {
+                ackRecieved.put(replicaID, timestampOther);
+            }
         }
         
         processRequest(request);
@@ -193,7 +195,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException { // This is after I recieve from main server
         clock.update(request.getTimestamp());
-        ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]", request.getRequestType(), "");
+        //ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]", request.getRequestType(), "");
         requests.add(request);
 
         return clock.getTime();
@@ -205,7 +207,7 @@ public class RMIBankServerImp implements RMIBankServer {
             if (timestamp < request.getTimestamp()) {
                 return false;
             }
-            else if (replicaID < request.getSendingServerID() && timestamp == request.getTimestamp()){
+            else if (timestamp == request.getTimestamp() && replicaID < this.serverID){
                 return false;
             }
         }
@@ -213,22 +215,19 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException {
-        while (requests.peek() != request || executeRequestCheck(request) == false) {
-        }
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
         System.out.println(clock.getTime());
-        executeRequest(request);
 
         for (String replicaAddress : serverIDToAddress.values()) {
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             replica.executeRequest(request);
         }
+        executeRequest(request);
     }
 
     public void executeRequest(Request request) throws RemoteException {
-        requests.remove(request);
-        ServerLogger.removeLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]");
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
 
-        
         switch (request.getRequestType()) {
             case "createAccount":
                 createAccount();
@@ -247,6 +246,8 @@ public class RMIBankServerImp implements RMIBankServer {
                 System.err.println("ERROR: Unknown Request Type: " + request.getRequestType());
                 break;
         }
+        requests.remove(request);
+        ServerLogger.removeLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]");
     }
     public static void main (String args[]) throws Exception {
         if (args.length != 2) {

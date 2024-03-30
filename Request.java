@@ -18,9 +18,6 @@ public class Request implements Serializable, Comparable<Request> {
     }
 
     public int compareTo(Request request) {
-        if (this == null || request == null) {
-            return 0;
-        }
         if (this.timestamp != request.getTimestamp()) {
             return this.timestamp - request.getTimestamp();
         } else {
