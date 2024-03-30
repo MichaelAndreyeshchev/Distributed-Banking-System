@@ -169,6 +169,10 @@ public class RMIBankServerImp implements RMIBankServer {
     public int getServerID() throws RemoteException {
         return this.serverID;
     }
+    public int syncClock(int timestamp){
+        clock.update(timestamp);
+        return clock.getTime();
+    }
 
     public String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException {        
         int logicalTime = clock.increment();
@@ -176,7 +180,7 @@ public class RMIBankServerImp implements RMIBankServer {
         request.setTimestamp(logicalTime);
         requests.add(request);
 
-        //ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
+        ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
         
         for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
@@ -184,10 +188,10 @@ public class RMIBankServerImp implements RMIBankServer {
             String replicaAddress = entry.getValue();
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             int timestampOther = replica.multicast(request, this.serverID);
-            tempClock.update(timestampOther);
+            clock.update(timestampOther);
             ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
         }
-        
+
         clock.update(tempClock.getTime());
         processRequest(request);
         return "OK";
@@ -207,7 +211,7 @@ public class RMIBankServerImp implements RMIBankServer {
             if (timestamp < request.getTimestamp()) {
                 return false;
             }
-            else if (timestamp == request.getTimestamp() && replicaID < this.serverID){
+            else if (timestamp == request.getTimestamp() && replicaID < request.getSendingServerID()){
                 return false;
             }
         }
@@ -215,7 +219,7 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException {
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false || clock.getTime() < request.getTimestamp()) {}
         System.out.println(clock.getTime());
 
         for (String replicaAddress : serverIDToAddress.values()) {
@@ -226,7 +230,28 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void executeRequest(Request request) throws RemoteException {
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
+        int i = 0;
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false || clock.getTime() < request.getTimestamp()){
+            i++;
+            if (i % 100000000 == 0) {
+                System.out.println("hit waiting");
+                System.out.println(!requests.peek().equals(request));
+                System.out.println(executeRequestCheck(request) == false);
+                for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
+                    try{
+                        int replicaID = entry.getKey();
+                        String replicaAddress = entry.getValue();
+                        RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
+                        int timestampOther = replica.syncClock(clock.getTime());
+                        clock.update(timestampOther);
+                        ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
+                    }
+                    catch (Exception e){
+
+                    } 
+                }
+            }
+        }
 
         switch (request.getRequestType()) {
             case "createAccount":
