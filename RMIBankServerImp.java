@@ -143,7 +143,7 @@ public class RMIBankServerImp implements RMIBankServer {
         }
     }
 
-    public String halt() throws RemoteException {
+    public String halt(Request r) throws RemoteException {
         int balanceAllAccounts = 0;
 
         for (Map.Entry<Integer, Account> entry : accounts.entrySet()) {
@@ -159,8 +159,8 @@ public class RMIBankServerImp implements RMIBankServer {
 
         String requestQueueString = sb.toString();
 
-        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + clock.getTime() + ", " + serverID + "]", balanceAllAccounts, requestQueueString);
-        System.out.println(String.valueOf(serverID) +  " [" + clock.getTime() + ", " + serverID + "] " + " " + balanceAllAccounts + " " + requestQueueString);
+        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + r.getTimestamp() + ", " + serverID + "]", balanceAllAccounts, requestQueueString);
+        System.out.println(String.valueOf(serverID) +  " [" + r.getTimestamp() + ", " + serverID + "] " + " " + balanceAllAccounts + " " + requestQueueString);
 
         return "OK";
 
@@ -176,25 +176,30 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException {        
         int logicalTime = clock.increment();
-        LamportClock tempClock = new LamportClock();
         request.setTimestamp(logicalTime);
         requests.add(request);
-
-        ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
+        //ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
-        
+
+        clock.updateNoIncrement(cast(request));
+
+        processRequest(request);
+        return "OK";
+    }
+
+    public synchronized int cast(Request request) throws RemoteException, MalformedURLException, NotBoundException {
+        LamportClock tempClock = new LamportClock();
+        tempClock.updateNoIncrement(request.getTimestamp());
+
         for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
             int replicaID = entry.getKey();
             String replicaAddress = entry.getValue();
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             int timestampOther = replica.multicast(request, this.serverID);
-            clock.update(timestampOther);
+            tempClock.update(timestampOther);
             ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
         }
-
-        clock.update(tempClock.getTime());
-        processRequest(request);
-        return "OK";
+        return tempClock.getTime();
     }
 
     public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException { // This is after I recieve from main server
@@ -215,13 +220,47 @@ public class RMIBankServerImp implements RMIBankServer {
                 return false;
             }
         }
-        return true;
+        int timestamp = clock.getTime();
+        if (timestamp < request.getTimestamp()){
+            return false;
+        }
+        else if (timestamp == request.getTimestamp() && this.serverID < request.getSendingServerID()){
+            return false;
+        }
+        else {
+            return true;
+        }
     }
 
     public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException {
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false || clock.getTime() < request.getTimestamp()) {}
-        System.out.println(clock.getTime());
+        int i = 0;
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {
+            i++;
+            if (i % 100000000 == 0) {
+                System.out.println("hit waiting");
+                System.out.println(!requests.peek().equals(request));
+                System.out.println(executeRequestCheck(request) == false);
+                for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
+                    try{
+                        int replicaID = entry.getKey();
+                        String replicaAddress = entry.getValue();
+                        RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
+                        int timestampOther = replica.syncClock(clock.getTime());
+                        clock.update(timestampOther);
+                        ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
+                    }
+                    catch (Exception e){
 
+                    } 
+                }
+            }
+        }
+        System.out.println(clock.getTime());
+        castExecute(request);
+        
+    }
+
+    public synchronized void castExecute(Request request) throws RemoteException, MalformedURLException, NotBoundException {
         for (String replicaAddress : serverIDToAddress.values()) {
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             replica.executeRequest(request);
@@ -231,7 +270,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public void executeRequest(Request request) throws RemoteException {
         int i = 0;
-        while (!requests.peek().equals(request) || executeRequestCheck(request) == false || clock.getTime() < request.getTimestamp()){
+        while (!requests.peek().equals(request) || executeRequestCheck(request) == false){
             i++;
             if (i % 100000000 == 0) {
                 System.out.println("hit waiting");
@@ -265,7 +304,7 @@ public class RMIBankServerImp implements RMIBankServer {
                 break;
 
             case "halt":
-                halt();
+                halt(request);
                 break;
             default:
                 System.err.println("ERROR: Unknown Request Type: " + request.getRequestType());
