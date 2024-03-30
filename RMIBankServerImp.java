@@ -200,8 +200,12 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public boolean executeRequestCheck(Request request) throws RemoteException {
-        for (int timestamp : ackRecieved.values()) {
+        for (Integer replicaID : ackRecieved.keySet()) {
+            int timestamp = ackRecieved.get(replicaID);
             if (timestamp < request.getTimestamp()) {
+                return false;
+            }
+            else if (replicaID < request.getSendingServerID() && timestamp == request.getTimestamp()){
                 return false;
             }
         }
@@ -221,7 +225,7 @@ public class RMIBankServerImp implements RMIBankServer {
     }
 
     public void executeRequest(Request request) throws RemoteException {
-        boolean succeded = requests.remove(request);
+        requests.remove(request);
         ServerLogger.removeLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]");
 
         
