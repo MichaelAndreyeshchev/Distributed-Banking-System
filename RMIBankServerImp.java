@@ -24,7 +24,7 @@ public class RMIBankServerImp implements RMIBankServer {
     private AtomicInteger accountUIDCounter = new AtomicInteger(1); // generate unique IDs for new accounts, starting from 1
     private LamportClock clock = new LamportClock(); // Lamport clock to help with executing the same sequence of operations, using the State Machine Model
     private PriorityBlockingQueue<Request> requests = new PriorityBlockingQueue<>();
-    private ConcurrentHashMap<Integer, Integer> ackRecieved = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, LamportClock> ackRecieved = new ConcurrentHashMap<>();
     private Map<Integer, String> serverIDToAddress = new HashMap<>();
     //private Map<Integer, RMIBankServer> replicaServers = new HashMap();
 
@@ -54,7 +54,7 @@ public class RMIBankServerImp implements RMIBankServer {
             if (serverID != this.serverID) {
                 String serverAddress = "//" + config[0] + ":" + config[2] + "/Server_" + config[1];
                 serverIDToAddress.put(serverID, serverAddress);
-                ackRecieved.put(serverID, 1);
+                ackRecieved.put(serverID, new LamportClock());
             }
         }
         reader.close();
@@ -172,38 +172,38 @@ public class RMIBankServerImp implements RMIBankServer {
 
     public String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException {        
         int logicalTime = clock.increment();
+        LamportClock tempClock = new LamportClock();
         request.setTimestamp(logicalTime);
+        requests.add(request);
 
         //ServerLogger.recieveClientLog(String.valueOf(serverID), "[" + logicalTime + ", " + this.serverID + "]", "" + request.getSendingServerID(), request.getRequestType(), " " + request.getSourceAccountUID() + " to " + request.getTargetAccountUID());
         request.SetSendingServerID(this.serverID);
-        requests.add(request);
         
         for (Map.Entry<Integer, String> entry : serverIDToAddress.entrySet()) {
             int replicaID = entry.getKey();
             String replicaAddress = entry.getValue();
             RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
             int timestampOther = replica.multicast(request, this.serverID);
-            clock.update(timestampOther);
-            if (timestampOther > ackRecieved.getOrDefault(replicaID, 0)) {
-                ackRecieved.put(replicaID, timestampOther);
-            }
+            tempClock.update(timestampOther);
+            ackRecieved.get(replicaID).updateNoIncrement(timestampOther);
         }
         
+        clock.update(tempClock.getTime());
         processRequest(request);
         return "OK";
     }
 
     public int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException { // This is after I recieve from main server
+        requests.add(request);
         clock.update(request.getTimestamp());
         //ServerLogger.recieveMulticastLog(String.valueOf(serverID), "[" + request.getTimestamp() + ", " + request.getSendingServerID() + "]", request.getRequestType(), "");
-        requests.add(request);
 
         return clock.getTime();
     }
 
     public boolean executeRequestCheck(Request request) throws RemoteException {
         for (Integer replicaID : ackRecieved.keySet()) {
-            int timestamp = ackRecieved.get(replicaID);
+            int timestamp = ackRecieved.get(replicaID).getTime();
             if (timestamp < request.getTimestamp()) {
                 return false;
             }

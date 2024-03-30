@@ -19,4 +19,8 @@ public class LamportClock {
         this.logicalTime++;
     }
 
+    public synchronized void updateNoIncrement(int receivedLogicalTime) {
+        this.logicalTime = Math.max(receivedLogicalTime, logicalTime);
+    }
+
 }
