@@ -18,6 +18,7 @@ import java.io.EOFException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.*;
+import java.nio.file.*;
 
 public class RMIBankServerImp implements RMIBankServer {
     private int serverID;
@@ -127,7 +128,7 @@ public class RMIBankServerImp implements RMIBankServer {
         }
     }
 
-    public void halt(Request r) throws RemoteException {
+    public void halt(Request r) throws RemoteException, IOException {
         requests.remove(r);
         int balanceAllAccounts = 0;
 
@@ -135,8 +136,20 @@ public class RMIBankServerImp implements RMIBankServer {
             int balance = entry.getValue().getBalance();
             balanceAllAccounts += balance;
         }
+        
+        long totalProcessingTime = 0;
+        int serverIDCounter = 0;
 
-        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + r.getTimestamp() + ", " + r.getSendingServerID() + "]", balanceAllAccounts, requests.size() + " ");
+        List<String> clientLogEntries = Files.readAllLines(Paths.get("clientLogfile.log"));
+        for (String line : clientLogEntries) {
+            if (line.contains("\"RSP\"") && line.contains("SRV-0")) {
+                long serverProcessingTime = Long.parseLong(line.split(" = ")[1]);
+                totalProcessingTime += serverProcessingTime;
+                serverIDCounter++;
+            }
+        }
+
+        ServerLogger.haltResultLog(String.valueOf(serverID), "[" + r.getTimestamp() + ", " + r.getSendingServerID() + "]", balanceAllAccounts, requests.size() + "", totalProcessingTime / serverIDCounter);
         System.out.println(String.valueOf(serverID) +  " [" + r.getTimestamp() + ", " + r.getSendingServerID() + "] " + " " + balanceAllAccounts + " " +  requests.size());
         shutdown();
     }
@@ -149,7 +162,8 @@ public class RMIBankServerImp implements RMIBankServer {
         return clock.getTime();
     }
 
-    public String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException {        
+    public long clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException, IOException {        
+        long t0 = System.nanoTime();
         int logicalTime = clock.increment();
         request.setTimestamp(logicalTime);
         requests.add(request);
@@ -159,7 +173,9 @@ public class RMIBankServerImp implements RMIBankServer {
         cast(request);
 
         processRequest(request);
-        return "OK";
+        long t1 = System.nanoTime();
+
+        return t1 - t0;
     }
 
     public synchronized void cast(Request request) throws RemoteException, MalformedURLException, NotBoundException {
@@ -203,13 +219,13 @@ public class RMIBankServerImp implements RMIBankServer {
         }
     }
 
-    public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException {
+    public void processRequest(Request request) throws MalformedURLException, RemoteException, NotBoundException, IOException {
         while (!requests.peek().equals(request) || executeRequestCheck(request) == false) {}
         System.out.println(clock.getTime());
         castExecute(request);
     }
 
-    public synchronized void castExecute(Request request) throws RemoteException, MalformedURLException, NotBoundException {
+    public synchronized void castExecute(Request request) throws RemoteException, MalformedURLException, NotBoundException, IOException {
         if (request.getRequestType().equals("halt")) {
             for (String replicaAddress : serverIDToAddress.values()) {
                 RMIBankServer replica = (RMIBankServer) Naming.lookup(replicaAddress);
@@ -233,7 +249,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
     }
 
-    public void executeRequest(Request request) throws RemoteException {
+    public void executeRequest(Request request) throws RemoteException, IOException {
         while (!requests.peek().equals(request)){}
 
         switch (request.getRequestType()) {
@@ -303,7 +319,14 @@ public class RMIBankServerImp implements RMIBankServer {
 
 
             //Registry registry = LocateRegistry.createRegistry(5000 + serverID); // Example port assignment logic
-            registry.bind("Server_" + serverID, bankServerStub);
+            try {
+                registry.bind("Server_" + serverID, bankServerStub);
+            }
+
+            catch (Exception e) {
+                registry.rebind("Server_" + serverID, bankServerStub);
+            }
+        
             System.out.println("Server " + serverID + " is ready.");
             System.out.println("//" + hostname + ":" + port + "/Server_" + serverID);
         }

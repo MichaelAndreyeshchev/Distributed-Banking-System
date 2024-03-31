@@ -11,11 +11,11 @@ public interface RMIBankServer extends Remote {
     int getBalance(int sourceAcountUID) throws RemoteException;
     String transfer(int sourceAcountUID, int targetAccountUID, int amount) throws RemoteException;
     void shutdown() throws RemoteException;
-    void halt(Request r) throws RemoteException;
+    void halt(Request r) throws RemoteException, IOException;
     int getServerID() throws RemoteException;
     int syncClock(int timestamp) throws RemoteException;
-    String clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException;
+    long clientRequest(Request request) throws RemoteException, MalformedURLException, NotBoundException, IOException;
     int multicast(Request request, int senderID) throws RemoteException, MalformedURLException, NotBoundException;
     boolean executeRequestCheck(Request request) throws RemoteException;
-    void executeRequest(Request request) throws RemoteException;
+    void executeRequest(Request request) throws RemoteException, IOException;
 }

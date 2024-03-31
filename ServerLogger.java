@@ -46,10 +46,10 @@ public class ServerLogger {
         }
     }
 
-    public static synchronized void haltResultLog(String serverID, String requestTimestamp, int sumAllAccountBalance, String requestQueueSize) {
+    public static synchronized void haltResultLog(String serverID, String requestTimestamp, int sumAllAccountBalance, String requestQueueSize, long averageProcessingTime) {
         try  {
             FileWriter fileWriter = new FileWriter(FILE_NAME + "_" + serverID + ".log", true);
-            String logEntry = String.format("Server-%s REQ_HALT %s %s | Sum of the balance in all 20 accounts = %s | Request Queue Size = %s%n", serverID, LocalDateTime.now(), requestTimestamp, "" + sumAllAccountBalance, requestQueueSize);            
+            String logEntry = String.format("Server-%s REQ_HALT %s %s | Sum of the balance in all 20 accounts = %s | Request Queue Size = %s | Average Processing Time = %s%n", serverID, LocalDateTime.now(), requestTimestamp, "" + sumAllAccountBalance, requestQueueSize, averageProcessingTime + "");            
             fileWriter.write(logEntry);
             fileWriter.flush();
             fileWriter.close();

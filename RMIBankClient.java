@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.rmi.RemoteException;
+import java.rmi.UnmarshalException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.net.*;
@@ -56,19 +57,18 @@ public class RMIBankClient {
                         try {
                             Request request = new Request("transfer", sourceAcountUID, targetAccountUID, 10, -1, thread);
                             ClientLogger.sendLog(thread + "", bankServerStub.getServerID() + "", "REQ", "transfer", " " + sourceAcountUID + " to " + targetAccountUID);
-                            String response = bankServerStub.clientRequest(request);
+                            long response = bankServerStub.clientRequest(request); // the response is the server processing time
                             ClientLogger.recieveLog(thread + "", bankServerStub.getServerID() + "", "transfer", response);
                         }
         
                         catch (RemoteException e) {
                             System.out.print("Remote Exception error encountered!");
-                            //ClientLogger.log("Transfer", sourceAcountUID, targetAccountUID, 10, "FAILED");
-                            //System.out.println("Failed transfer");
                         } catch (MalformedURLException e) {
                             System.out.print("Maleformed URL error encountered!");
+                        } catch (IOException e) {
+                                System.out.print("IO Exception error encountered!");
                         } catch (NotBoundException e) {
                             System.out.println(e);
-                            //System.out.print("Not Bound error encountered!");
                         }
                     }
                 });
@@ -89,7 +89,7 @@ public class RMIBankClient {
 
             Request request = new Request("halt", -1, -1, -1, -1, 0);
             ClientLogger.sendLog("0", bankServerStub.getServerID() + "", "REQ", "halt", "");
-            String response = bankServerStub.clientRequest(request);
+            long response = bankServerStub.clientRequest(request);
             ClientLogger.recieveLog("0", bankServerStub.getServerID() + "", "halt", response);
 
             //RMIBankServer serverStub = bankServerStubs.get(0);
@@ -112,6 +112,10 @@ public class RMIBankClient {
             // System.out.println("The Total Account Balance is: " + totalAccountsBalance);
                
         }
+
+    catch (UnmarshalException e) {
+        System.out.println("The servers have been sucessfully terminated!");
+    }
 
     catch (Exception e) {
         Thread.currentThread().interrupt();

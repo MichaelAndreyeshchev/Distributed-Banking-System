@@ -18,10 +18,10 @@ public class ClientLogger {
         }
     }
 
-    public static synchronized void recieveLog(String clientID, String serverID, String operation, String status) {
+    public static synchronized void recieveLog(String clientID, String serverID, String operation, long response) {
         try  {
             FileWriter fileWriter = new FileWriter(FILE_NAME, true);
-            String logEntry = String.format("CLNT-%s SRV-%s \"%s\" %s %s%n", clientID, serverID, operation.equals("REQ") ? "REQ" : "RSP", LocalDateTime.now(), status);
+            String logEntry = String.format("CLNT-%s SRV-%s \"%s\" %s | Server Processing Time = %s%n", clientID, serverID, operation.equals("REQ") ? "REQ" : "RSP", LocalDateTime.now(), response);
             fileWriter.write(logEntry);
             fileWriter.flush();
             fileWriter.close();
