@@ -9,6 +9,8 @@ import java.rmi.UnmarshalException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.io.*;
 import java.util.*;
 
@@ -17,27 +19,17 @@ public class RMIBankClient {
         try {
             if (args.length != 2) {
                 throw new RuntimeException("Usage: java RMIBankClient <threadCount> <configFileName>");
-                //System.err.println("Usage: java BankClient <serverHostname> <serverPortnumber> <threadCount> <iterationCount>");
-                //System.exit(1);
             }
-            String configFilePath = args[1];
-            int threads = Integer.parseInt(args[0]);
-            List<RMIBankServer> bankServerStubs = new ArrayList<>();
+            String configFilePath = args[1]; // config file path specifying the hostname, server ID, and port. The config file is either 'local_host_config_file.txt', 'one_server_config_file.txt', 'three_server_config_file.txt', or 'five_server_config_file.txt'.
+            int threads = Integer.parseInt(args[0]); // the number of threads specified
+            List<RMIBankServer> bankServerStubs = new ArrayList<>(); // hold the stubs representing each server process
             
             BufferedReader reader = new BufferedReader(new FileReader(configFilePath));
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null) { // iterate through config file and lookup RMI server stub (representing each server process) and add them into the ArrayList
                 String[] config = line.split(" ");
             
                 Registry registry = LocateRegistry.getRegistry(config[0], Integer.parseInt(config[2]));
-                // String[] boundNames = registry.list();
-                // System.out.println("Names bound in RMI registry:");
-                // for (String name : boundNames) {
-                //     System.out.println(name);
-                //     //RMIBankServer bankServerStub = (RMIBankServer) registry.lookup(name);
-
-                // }
-                // RMIBankServer bankServerStub = (RMIBankServer) registry.lookup("//" + config[0] + ":" + Integer.parseInt(config[2]) + "/Server_" + Integer.parseInt(config[1]));
                 RMIBankServer bankServerStub = (RMIBankServer) registry.lookup("Server_" + Integer.parseInt(config[1]));
                 bankServerStubs.add(bankServerStub);
             }
@@ -45,16 +37,16 @@ public class RMIBankClient {
             Random random = new Random();
             ExecutorService executor = Executors.newFixedThreadPool(threads); // fixed thread pool size
             
-            for (int i = 1; i <= threads; i++) {
+            for (int i = 1; i <= threads; i++) { 
                 final int thread = i;
                 executor.submit(() -> {
                     for (int k = 0; k < 200; k++) {
-                        RMIBankServer bankServerStub = bankServerStubs.get(random.nextInt(bankServerStubs.size()));
+                        RMIBankServer bankServerStub = bankServerStubs.get(random.nextInt(bankServerStubs.size())); // randomly pick one of the server replicas
 
-                        int sourceAcountUID = random.nextInt(20) + 1;
-                        int targetAccountUID = random.nextInt(20) + 1;
+                        int sourceAcountUID = random.nextInt(20) + 1; // source random account
+                        int targetAccountUID = random.nextInt(20) + 1; // target random account
                         
-                        try {
+                        try { // Send the transfer request to the chosen server replica
                             Request request = new Request("transfer", sourceAcountUID, targetAccountUID, 10, -1, thread);
                             ClientLogger.sendLog(thread + "", bankServerStub.getServerID() + "", "REQ", "transfer", " " + sourceAcountUID + " to " + targetAccountUID);
                             long response = bankServerStub.clientRequest(request); // the response is the server processing time
@@ -87,29 +79,22 @@ public class RMIBankClient {
 
             RMIBankServer bankServerStub = bankServerStubs.get(0);
 
-            Request request = new Request("halt", -1, -1, -1, -1, 0);
-            ClientLogger.sendLog("0", bankServerStub.getServerID() + "", "REQ", "halt", "");
+            Request request = new Request("halt", -1, -1, -1, -1, 0); // set up request for the HALT command
+            long totaResponseTime = 0;
+            int fileLineCounter = 0;
+
+            List<String> clientLogEntries = Files.readAllLines(Paths.get("clientLogfile.log"));
+            for (String fileLine : clientLogEntries) { // calculate the average value of the response times observed by the client
+                if (fileLine.contains("\"RSP\"")) {
+                    long serverProcessingTime = Long.parseLong(fileLine.split(" = ")[1]);
+                    totaResponseTime += serverProcessingTime;
+                    fileLineCounter++;
+                }
+            }
+            // sending a HALT command to the server process with server ID equal to zero 
+            ClientLogger.sendLog("0", bankServerStub.getServerID() + "", "REQ", "halt", totaResponseTime / fileLineCounter + "");
             long response = bankServerStub.clientRequest(request);
             ClientLogger.recieveLog("0", bankServerStub.getServerID() + "", "halt", response);
-
-            //RMIBankServer serverStub = bankServerStubs.get(0);
-            //serverStub.shutdown();
-
-            //for (RMIBankServer serverStub : bankServerStubs) {
-            //    serverStub.shutdown();
-            //}
-            // int totalAccountsBalance = 0;
-            // RMIBankServer bankServerStub = bankServerStubs.get(random.nextInt(bankServerStubs.size()));
-
-            // for (int i = 1; i <= 20; i++) { // after all threads have completed their tasks, it calculates and prints the total balance across all accounts again
-            //     int balance = bankServerStub.getBalance(i);
-            //     Request request = Request("transfer", sourceAcountUID, targetAccountUID, 10, -1, -1);
-            //     bankServerStub.clientRequest(request);
-                
-            //     totalAccountsBalance += balance;
-
-            // }
-            // System.out.println("The Total Account Balance is: " + totalAccountsBalance);
                
         }
 
