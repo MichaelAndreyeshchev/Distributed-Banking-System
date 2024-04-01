@@ -144,7 +144,7 @@ public class RMIBankServerImp implements RMIBankServer {
 
         List<String> clientLogEntries = Files.readAllLines(Paths.get("clientLogfile.log"));
         for (String line : clientLogEntries) { // calculate the total server processing time
-            if (line.contains("\"RSP\"") && line.contains("SRV-0")) {
+            if (line.contains("\"RSP\"") && line.contains("SRV-" + serverID)) {
                 long serverProcessingTime = Long.parseLong(line.split(" = ")[1]);
                 totalProcessingTime += serverProcessingTime;
                 serverIDCounter++;
