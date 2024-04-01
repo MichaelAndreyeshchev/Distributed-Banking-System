@@ -64,16 +64,16 @@ Note that the account balancess for all accounts in the servers are printed at t
 Also, the last line contains the sum of the balance in all 20 accounts.
 Also, the timestamp in the Request.java class refers to the Lamport Clock value!
 
-# Performance Measurements
+# Performance Measurement Results (USING THE LOG FILES SPECIFIED ABOVE)
     * One Server Replica Process: 
-        * Average Processing Time for the Server 0 = 151244472
-        * Average Response Time for the Client = 151244472
+        * Average Processing Time for the Server 0 = 37734584 nanoseconds
+        * Average Response Time for the Client = 37734584 nanoseconds
 
     * Three Server Replica Process: 
-        * Average Processing Time for the Server 0 = 520117530
-        * Average Processing Time for the Server 1 = 520117530
-        * Average Processing Time for the Server 2 = 520117530
-        * Average Response Time for the Client = 524655105
+        * Average Processing Time for the Server 0 = 418439183 nanoseconds
+        * Average Processing Time for the Server 1 = 418439183 nanoseconds
+        * Average Processing Time for the Server 2 = 418439183 nanoseconds
+        * Average Response Time for the Client = 421069570 nanoseconds
 
     * Five Server Replica Process: 
         * Average Processing Time for the Server 0 = 642960963
