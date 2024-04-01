@@ -1,10 +1,14 @@
 Group members: Michael and Wyatt (andr0821 & rasmu984)
 
+# IMPORTANT NOTE:
+The RMIBankClient should be executed using machine csel-kh1250-02! 
+If the code freezes at five servers just terminate all servers using ^C, and then rerun the three server experiemnt, then rerun the five server experiment. 
+
 # Running One Server Replica Process ON SEPERATE MACHINES (the machines are listed in the one_server_config_file):
 ```
 $ javac *.java
 
-$ java RMIBankClient 24 "one_server_config_file.txt"
+$ java RMIBankClient 24 "one_server_config_file.txt" 
 
 $ java RMIBankServerImp 0 "one_server_config_file.txt"
 ```
@@ -76,9 +80,9 @@ Also, the timestamp in the Request.java class refers to the Lamport Clock value!
         * Average Response Time for the Client = 421069570 nanoseconds
 
     * Five Server Replica Process: 
-        * Average Processing Time for the Server 0 = 642960963
-        * Average Processing Time for the Server 1 = 642960963
-        * Average Processing Time for the Server 2 = 642960963
-        * Average Processing Time for the Server 3 = 642960963
-        * Average Processing Time for the Server 4 = 642960963
-        * Average Response Time for the Client = 638863212
+        * Average Processing Time for the Server 0 = 513254223 nanoseconds
+        * Average Processing Time for the Server 1 = 513254223 nanoseconds
+        * Average Processing Time for the Server 2 = 513254223 nanoseconds
+        * Average Processing Time for the Server 3 = 513254223 nanoseconds
+        * Average Processing Time for the Server 4 = 513254223 nanoseconds
+        * Average Response Time for the Client = 544870337 nanoseconds
