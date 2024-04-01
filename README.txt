@@ -70,19 +70,19 @@ Also, the timestamp in the Request.java class refers to the Lamport Clock value!
 
 # Performance Measurement Results (USING THE LOG FILES SPECIFIED ABOVE)
     * One Server Replica Process: 
-        * Average Processing Time for the Server 0 = 37734584 nanoseconds
-        * Average Response Time for the Client = 37734584 nanoseconds
+        * Average Processing Time for the Server 0 = 137252982 nanoseconds
+        * Average Response Time for the Client = 137252982 nanoseconds
 
     * Three Server Replica Process: 
-        * Average Processing Time for the Server 0 = 418439183 nanoseconds
-        * Average Processing Time for the Server 1 = 418439183 nanoseconds
-        * Average Processing Time for the Server 2 = 418439183 nanoseconds
-        * Average Response Time for the Client = 421069570 nanoseconds
+        * Average Processing Time for the Server 0 = 384581457 nanoseconds
+        * Average Processing Time for the Server 1 = 384829459 nanoseconds
+        * Average Processing Time for the Server 2 = 389569318 nanoseconds
+        * Average Response Time for the Client = 386380979 nanoseconds
 
     * Five Server Replica Process: 
-        * Average Processing Time for the Server 0 = 513254223 nanoseconds
-        * Average Processing Time for the Server 1 = 513254223 nanoseconds
-        * Average Processing Time for the Server 2 = 513254223 nanoseconds
-        * Average Processing Time for the Server 3 = 513254223 nanoseconds
-        * Average Processing Time for the Server 4 = 513254223 nanoseconds
-        * Average Response Time for the Client = 544870337 nanoseconds
+        * Average Processing Time for the Server 0 = 552711069 nanoseconds
+        * Average Processing Time for the Server 1 = 551128619 nanoseconds
+        * Average Processing Time for the Server 2 = 553297346 nanoseconds
+        * Average Processing Time for the Server 3 = 552492923 nanoseconds
+        * Average Processing Time for the Server 4 = 547913158 nanoseconds
+        * Average Response Time for the Client = 551506582 nanoseconds
