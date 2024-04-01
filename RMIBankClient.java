@@ -49,8 +49,10 @@ public class RMIBankClient {
                         try { // Send the transfer request to the chosen server replica
                             Request request = new Request("transfer", sourceAcountUID, targetAccountUID, 10, -1, thread);
                             ClientLogger.sendLog(thread + "", bankServerStub.getServerID() + "", "REQ", "transfer", " " + sourceAcountUID + " to " + targetAccountUID);
+                            long t0 = System.nanoTime(); 
                             long response = bankServerStub.clientRequest(request); // the response is the server processing time
-                            ClientLogger.recieveLog(thread + "", bankServerStub.getServerID() + "", "transfer", response);
+                            long t1 = System.nanoTime(); 
+                            ClientLogger.recieveLog(thread + "", bankServerStub.getServerID() + "", "transfer", t1 - t0); // we set the response variable to be the response time observed by the clients
                         }
         
                         catch (RemoteException e) {
